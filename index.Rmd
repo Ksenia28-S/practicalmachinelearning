@@ -1,0 +1,91 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Ksenia Slivkina"
+date: "23 09 2020"
+output: html_document
+---
+
+Course Project.
+
+I possess data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. In this project i used to predict the manner in which these people did the exercise.
+
+Plan of the work:
+* load the data.
+* implement cross-validation.
+* clean the data.
+* built a model with Random Forests alforithm.
+* apply it for testing set.
+* predict 20 different test cases using this model.
+
+Loading all needed libraries.
+```{r}
+library(caret)
+library(randomForest)
+library(dplyr)
+```
+Reading the data for training and testing.
+```{r}
+Datatraining = read.csv("pml-training.csv")
+Datatesting = read.csv("pml-testing.csv")
+```
+Using cross-validation to creat dataset "train" ,and devide it into 60% of training set (for model building) and 40% of testing set (for tesing model).
+```{r}
+set.seed(1234)
+train = createDataPartition(y = Datatraining$classe,p = .60,list = FALSE)
+training = Datatraining[train,]
+testing = Datatraining[-train,]
+```
+Aplly "nearZeroVar" function to find variables that have no variability and won't be useful covariates, then remove them from training set.
+```{r}
+training = training %>%
+  select_at(vars(-one_of(nearZeroVar(., names = TRUE))))
+
+```
+Continue cleaning the training set: 
+1) delete colums that are useless for making predictions:ID variable, user_name, all varianles with timestamps and window data.
+2) keep colums with less than or equal to 95% of NA’s.
+```{r}
+DELCOL = grep("X|user_name|timestamp|window", colnames(training), value = FALSE) 
+trainingclean = training[,-DELCOL]
+# replace missing data by NA's
+trainingclean[trainingclean == ""] = NA
+NAcount = apply(trainingclean, 2, function(k) sum(is.na(k)))/nrow(trainingclean)
+trainingclean = trainingclean[NAcount <= 0.95]
+```
+I use Random Rorests alforithm to create a model as it is one of the most highly accurate methods for prediction.
+```{r}
+modFit = randomForest(trainingclean$classe ~ ., data = trainingclean,do.trace = FALSE)
+modFit 
+```
+Error rate is only 0.61% that seems to be good.
+
+Aplly cleaning algorithm to the testing set.
+```{r}
+testing = testing %>%
+  select_at(vars(-one_of(nearZeroVar(., names = TRUE))))
+testingclean = testing[,-DELCOL]
+testingclean[testingclean == ""] <- NA
+NAcount = apply(testingclean, 2, function(k) sum(is.na(k)))/nrow(testingclean)
+testingclean = testingclean[NAcount <= 0.95]
+```
+Make prediction and create confusion matrix to test results.
+```{r}
+prediction_testingCl <- predict(modFit, testingclean, type = "class")
+confusionMatrix(testingclean$classe,prediction_testingCl)
+```
+Accuracy on the testing set is 99,4 % , this is very high result.
+
+Check on the test set and look at predictions for 20 test cases.
+```{r}
+Datatesting = Datatesting %>%
+  select_at(vars(-one_of(nearZeroVar(., names = TRUE))))
+testdataclean = Datatesting[,-DELCOL]
+testdataclean[testdataclean == ""] <- NA
+NAcount = apply(testdataclean, 2, function(k) sum(is.na(k)))/nrow(testdataclean)
+testdataclean = testdataclean[NAcount <= 0.95]
+testdataclean$classe = predict(modFit,testdataclean)
+```
+
+```{r}
+testdataclean$classe
+````
